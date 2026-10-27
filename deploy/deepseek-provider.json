@@ -1,0 +1,22 @@
+{
+  "baseUrl": "https://api.deepseek.com",
+  "api": "openai-completions",
+  "auth": "api-key",
+  "apiKey": "${DEEPSEEK_API_KEY}",
+  "timeoutSeconds": 60,
+  "request": {
+    "proxy": {
+      "mode": "env-proxy"
+    }
+  },
+  "models": [
+    {
+      "id": "deepseek-flash",
+      "name": "DeepSeek V4 Flash",
+      "reasoning": false,
+      "input": ["text"],
+      "contextWindow": 1000000,
+      "maxTokens": 16384
+    }
+  ]
+}

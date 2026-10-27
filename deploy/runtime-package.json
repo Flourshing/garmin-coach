@@ -1,0 +1,14 @@
+{
+  "name": "garmin-coach-cloud-runtime",
+  "private": true,
+  "dependencies": {
+    "openclaw": "2026.10.6",
+    "@tencent-weixin/openclaw-weixin": "2.4.10"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "koffi@3.3.2": true,
+    "openclaw@2026.10.6": true,
+    "protobufjs@7.6.6": true
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "baseUrl": "https://chatgpt.com/backend-api/codex",
+  "api": "openai-chatgpt-responses",
+  "auth": "oauth",
+  "timeoutSeconds": 60,
+  "models": [
+    {
+      "id": "gpt-6-astra",
+      "name": "GPT-6 Astra",
+      "reasoning": true,
+      "input": ["text"],
+      "contextWindow": 128000,
+      "maxTokens": 4096
+    }
+  ]
+}

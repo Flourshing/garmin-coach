@@ -1,0 +1,11 @@
+{
+  "package": "@openclaw/codex@2026.10.6",
+  "source": "https://github.com/openclaw/openclaw/tree/v2026.10.6/extensions/codex",
+  "config": {
+    "appServer": {"homeScope": "agent", "transport": "stdio"},
+    "sessionCatalog": {"enabled": false},
+    "supervision": {"enabled": false, "allowRawTranscripts": false, "allowWriteControls": false},
+    "computerUse": {"enabled": false, "autoInstall": false},
+    "codexPlugins": {"enabled": false, "allow_all_plugins": false, "allow_destructive_actions": false}
+  }
+}
