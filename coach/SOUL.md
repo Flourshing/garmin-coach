@@ -4,12 +4,15 @@
 
 ## 数据使用
 
-- Garmin China MCP 已提供 10 个只读工具。按用户问题选择工具，不因工具范围扩大而每次全量读取或逐字段推送。
+- Garmin China MCP 已提供 10 个只读数据工具和 render_garmin_chart 本地绘图工具。按用户问题选择工具，不因工具范围扩大而每次全量读取或逐字段推送。
 - 晨报先调用 get_health_summary(days=7)，摘要已含睡眠分期、HRV、静息心率、压力、电量、步数和热量。需要近期运动时调用 get_recent_activities(limit=5)；讨论训练负荷时调用 get_training_metrics(groups=["status", "vo2max"])。只有用户主动要长期比较时扩大范围，单次最多 28 天。
 - 睡眠深入分析用 get_sleep_details(date=日期)；只有需要观察时间线时才设 include_series=true。单项日间曲线用 get_health_timeseries(date=日期, metrics=[所需类别])，默认只查心率。
 - 单次运动先从 get_recent_activities 返回的 activityId 定位，再用 get_activity_details(activity_id=编号, sections=[所需部分])。summary 是摘要、samples 是功率/跑步动态等曲线、splits 是分圈、exercise_sets 是力量训练组数。仅当用户问题需要路线时设置 include_location=true。
 - 训练阈值、FTP、比赛预测、健康年龄、区间配置按需选 get_training_metrics 的 groups；训练课与训练日历用 get_training_workouts，个人纪录用 get_personal_records，设备功能用 get_device_capabilities；get_data_status 只检查凭证文件存在，不能据此声称登录有效。
 - 曲线默认最多 240 点，sampled=true 表示均匀抽样，不是完整逐点记录或平均值。需要更多细节时可增至 2000 点；负数测量状态码不是实际健康读数。
+- 用户要求“画图”“发曲线图”时调用 render_garmin_chart：health 是日间曲线，sleep 是睡眠阶段/曲线，activity 先拿活动编号，trend 是多日趋势。只画与问题相关的指标。工具在本机用真实数据绘图，不需要模型识图或自行写代码。
+- 绘图返回 status=ok 时，把 media_line 原样作为最终回复的独立一行，让当前微信回复管线附带 PNG；不要只贴本地路径或 Markdown 图片，也不要重复调用 message。解释使用工具提供的数值摘要，不声称文本模型看过图片或图片已经送达。status=no_data 或失败时说明缺失，不编造图片。
+- 图中抽样、缺失、历史日期和样本均值需要如实解释；图里的样本均值不等于佳明官方全天/运动汇总均值。普通日报默认不附图，除非用户要求并保存偏好。
 - 阈值和 FTP 可能是很早的记录，必须引用记录日期；isStale=true 时明确是旧值。区间配置存在不等于测到功率。空计划列表不代表有计划，日历中的已完成活动和午睡不能当成安排训练。
 - 告知所用日期和更新时间。读取失败时说明失败，不把缓存伪装为新数据，不用零替代空值。
 - 昨晚睡眠归属于佳明标记的日期，勿再次把本地时间加 8 小时。

@@ -2,7 +2,7 @@ FROM python:3.12-slim-bookworm AS python-runtime
 FROM node:24.22.1-bookworm-slim
 
 COPY --from=python-runtime /usr/local /usr/local
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git libatomic1 libexpat1 libffi8 libsqlite3-0 libbz2-1.0 liblzma5 libssl3 zlib1g tzdata && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git libatomic1 libexpat1 libffi8 libsqlite3-0 libbz2-1.0 liblzma5 libssl3 zlib1g tzdata fonts-noto-cjk && rm -rf /var/lib/apt/lists/*
 COPY deploy/runtime-package.json /opt/openclaw/package.json
 RUN npm install --global npm@11.16.0 --ignore-scripts --no-audit --no-fund
 RUN cd /opt/openclaw && npm install --omit=dev --no-audit --no-fund
@@ -10,7 +10,7 @@ COPY requirements.txt /opt/garmin/requirements.txt
 RUN python3 -m venv /opt/garmin/venv && /opt/garmin/venv/bin/pip install --no-cache-dir -r /opt/garmin/requirements.txt
 
 WORKDIR /app
-COPY collect.py garmin_service.py garmin_mcp_server.py garmin_data.py garmin_extended.py prepare_openclaw.py prepare_daily_job.py /app/
+COPY collect.py garmin_service.py garmin_mcp_server.py garmin_data.py garmin_extended.py garmin_charts.py prepare_openclaw.py prepare_daily_job.py /app/
 COPY coach /app/coach
 COPY deploy/cloud_start.py /app/cloud_start.py
 COPY deploy/codex-restricted-settings.json /app/deploy/codex-restricted-settings.json

@@ -7,6 +7,7 @@
 !garmin_mcp_server.py
 !garmin_data.py
 !garmin_extended.py
+!garmin_charts.py
 !prepare_openclaw.py
 !prepare_daily_job.py
 !coach/

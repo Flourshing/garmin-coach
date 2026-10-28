@@ -10,7 +10,7 @@
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -t . -v
-.\.venv\Scripts\python.exe -m compileall -q collect.py garmin_data.py garmin_extended.py garmin_service.py garmin_mcp_server.py prepare_openclaw.py
+.\.venv\Scripts\python.exe -m compileall -q collect.py garmin_data.py garmin_extended.py garmin_charts.py garmin_service.py garmin_mcp_server.py prepare_openclaw.py
 .\.venv\Scripts\python.exe -X utf8 verify_current_mcp.py
 ```
 
@@ -28,7 +28,7 @@
 ## 修改字段或新增工具
 
 1. 在 `garmin_data.py` 调整共享字段和过滤规则，或在 `garmin_extended.py` 添加分类查询。
-2. 在 `garmin_mcp_server.py` 注册只读工具，并同步 `TOOL_NAMES`；不要给只读接口增加写入操作。
+2. 在 `garmin_mcp_server.py` 注册只读工具，并同步 `TOOL_NAMES`；不要给数据查询接口增加写入操作。本地绘图工具须如实声明文件写入行为，不得标为无副作用读取。
 3. 保留日期、单位、空值、读取失败、旧记录和抽样信息。新增字段不能默认填 0。
 4. 更新离线测试和 `docs/MCP.md`；工具或默认查询变动时同步教练规则。
 5. 新增运行模块时同步 `Dockerfile`、`.dockerignore` 和 `prepare_railway_build.FILES`。

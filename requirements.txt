@@ -1,3 +1,4 @@
 garminconnect==0.3.10
 curl_cffi>=0.15,<0.16
 mcp==1.28.1
+matplotlib==3.11.2

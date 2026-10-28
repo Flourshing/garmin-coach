@@ -29,7 +29,7 @@ class WorkspaceTests(unittest.TestCase):
 
     def test_deployment_includes_preferences_and_all_runtime_modules(self):
         root = Path(__file__).resolve().parents[1]
-        for name in ["garmin_data.py", "garmin_extended.py", "coach/PREFERENCES.md"]:
+        for name in ["garmin_data.py", "garmin_extended.py", "garmin_charts.py", "coach/PREFERENCES.md"]:
             self.assertIn(name, FILES)
         self.assertNotIn("verify_mcp.py", FILES)
         self.assertTrue(all((root / name).is_file() for name in FILES))

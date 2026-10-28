@@ -26,10 +26,12 @@ async def verify(live=False, days=1, end_date=None):
             tools = (await session.list_tools()).tools
             expected = set(TOOL_NAMES)
             assert {tool.name for tool in tools} == expected
-            assert all(tool.annotations.readOnlyHint for tool in tools)
+            assert all(tool.annotations.readOnlyHint for tool in tools if tool.name != "render_garmin_chart")
+            assert all(not tool.annotations.destructiveHint for tool in tools)
             status = await session.call_tool("get_data_status", {})
             assert not status.isError
-            report = {"protocol": "passed", "read_only_tools": sorted(expected), "live": False}
+            report = {"protocol": "passed", "read_only_tools": sorted(expected - {"render_garmin_chart"}),
+                      "local_artifact_tools": ["render_garmin_chart"], "live": False}
             if live:
                 responses = {}
                 async def call(name, arguments, label=None):
@@ -70,6 +72,9 @@ async def verify(live=False, days=1, end_date=None):
                 await call("get_training_workouts", {"kind": "plans", "refresh": True}, "training_plans")
                 await call("get_personal_records", {"refresh": True})
                 await call("get_device_capabilities", {"refresh": True})
+                chart = await call("render_garmin_chart", {"kind": "sleep", "date": date,
+                                   "metrics": ["stages", "heart_rate"], "max_points": 100})
+                assert chart["status"] == "ok" and Path(chart["image_path"]).is_file()
                 responses["get_data_status"] = json.loads(next(b.text for b in status.content if b.type == "text"))
                 atomic_json(DATA / "mcp-expanded-results.json", responses)
                 report.update(live=True, date=date, days=len(rows), endpoints="passed", verified_queries=len(responses))

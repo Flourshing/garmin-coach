@@ -7,6 +7,7 @@ TOOL_NAMES = (
     "get_sleep_details", "get_health_timeseries", "get_training_metrics",
     "get_activity_details", "get_training_workouts", "get_personal_records",
     "get_device_capabilities",
+    "render_garmin_chart",
 )
 
 
