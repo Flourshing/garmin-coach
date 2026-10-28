@@ -13,7 +13,7 @@ from getpass import getpass
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from verify_mcp import safe_error
+from garmin_data import ACTIVITY_FIELDS, DAILY_FIELDS, clean_data, selected, safe_error
 
 ROOT = Path(__file__).resolve().parent
 PRIVATE = Path(os.environ.get("GARMIN_DATA_DIR", ROOT / ".private")).resolve()
@@ -104,19 +104,36 @@ def summarize(day, stats, sleep, hrv, activities):
     # Duration avoids China-region sleep *Local timestamp double-offset issues.
     return {
         "date": day,
-        "daily": {key: number(stats.get(key)) for key in
-                  ["totalSteps", "restingHeartRate", "averageStressLevel",
-                   "bodyBatteryHighestValue", "bodyBatteryLowestValue"]},
+        "daily": {key: number(stats.get(key)) for key in DAILY_FIELDS},
+        "daily_context": selected(stats, ("stressQualifier", "latestSpo2ReadingTimeGmt", "latestSpo2ReadingTimeLocal",
+                                         "latestRespirationTimeGMT", "bodyBatteryDynamicFeedbackEvent",
+                                         "endOfDayBodyBatteryDynamicFeedbackEvent", "bodyBatteryActivityEventList")),
         "sleep": {
             "hours": round(seconds / 3600, 2) if seconds is not None else None,
             "score": number(overall.get("value")),
+            **{label: number(dto.get(key)) for label, key in {
+                "deep_seconds": "deepSleepSeconds", "light_seconds": "lightSleepSeconds",
+                "rem_seconds": "remSleepSeconds", "awake_seconds": "awakeSleepSeconds",
+                "nap_seconds": "napTimeSeconds", "unmeasurable_seconds": "unmeasurableSleepSeconds",
+                "awake_count": "awakeCount", "avg_hr": "avgHeartRate", "avg_stress": "avgSleepStress",
+                "spo2_avg": "averageSpO2Value", "spo2_min": "lowestSpO2Value", "spo2_max": "highestSpO2Value",
+                "respiration_avg": "averageRespirationValue", "respiration_min": "lowestRespirationValue",
+                "respiration_max": "highestRespirationValue",
+            }.items()},
+            "start_gmt": dto.get("sleepStartTimestampGMT"),
+            "end_gmt": dto.get("sleepEndTimestampGMT"),
+            "sleep_scores": clean_data(scores),
+            "feedback": dto.get("sleepScoreFeedback"),
+            "insight": dto.get("sleepScoreInsight"),
+            "personalized_insight": dto.get("sleepScorePersonalizedInsight"),
+            "sleep_need": clean_data(dto.get("sleepNeed")),
+            "next_sleep_need": clean_data(dto.get("nextSleepNeed")),
+            "restless_moments": number(sleep.get("restlessMomentsCount")),
+            "body_battery_change": sleep.get("bodyBatteryChange"),
         },
-        "hrv": subset(hrv.get("hrvSummary") or {},
-                      ["lastNightAvg", "weeklyAvg", "status", "baseline"]),
-        "activities": [subset(item, ["activityType", "distance", "duration",
-                                     "movingDuration", "averageHR", "maxHR",
-                                     "averageSpeed", "aerobicTrainingEffect",
-                                     "anaerobicTrainingEffect"])
+        "hrv": clean_data(subset(hrv.get("hrvSummary") or {},
+                      ["lastNightAvg", "weeklyAvg", "lastNight5MinHigh", "status", "baseline", "feedbackPhrase"])),
+        "activities": [clean_data(subset(item, [key for key in ACTIVITY_FIELDS if key != "activityName"]))
                        for item in activities if isinstance(item, dict)],
         "units": {"distance": "meters", "duration": "seconds",
                   "averageSpeed": "meters/second", "heartRate": "bpm", "hrv": "ms"},

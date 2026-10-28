@@ -1,292 +1,132 @@
-# Garmin 微信私人教练（OpenClaw + DeepSeek）
+# Garmin 微信私人教练
 
-> 通过微信和你的 Garmin 数据对话：一个只读、隐私优先的个人健康教练机器人。
+通过微信查询自己的 Garmin 数据，用 DeepSeek 分析睡眠、恢复和训练。基于 OpenClaw、Garmin Connect 中国区与只读 MCP 工具。
 
-你在微信里问「我最近七天睡得怎么样」，它会真正去佳明中国区拉取你的睡眠、HRV、静息心率和运动记录，再由大模型给出中文分析和建议——**数据只经过你自己的机器和模型 API，不发给第三方。**
+你可以问：“昨晚深睡多久？”“最近跑步的心率和功率有什么变化？”也可以直接告诉 bot：“以后日报只保留睡眠、恢复和今天的训练建议，控制在 300 字以内。”
 
----
+## 已支持什么
 
-## 目录
+- **10 个分类查询工具**：健康摘要、睡眠详情、健康曲线、训练指标、运动列表与详情、训练课、个人纪录和设备能力。
+- **按问题取数**：默认使用摘要，曲线和运动详情按需读取，不会因为接入更多字段就每次查询或展示全部数据。
+- **微信调整内容偏好**：主题、篇幅、语气和展示重点可在聊天中调整，保存到私有工作区，供下次聊天和日报使用。
+- **明确数据边界**：保留缺失、历史日期、过期标记、抽样信息与读取失败状态；不生成 255 不支持的分数。
+- **只读佳明**：不会改动活动、手表设置或下发训练。GPS 轨迹须在详情查询中显式开启。
 
-- [这是什么](#这是什么)
-- [架构](#架构)
-- [功能](#功能)
-- [快速开始](#快速开始)
-- [配置说明](#配置说明)
-- [可用工具](#可用工具)
-- [部署到云端](#部署到云端)
-- [安全与隐私](#安全与隐私)
-- [常见问题](#常见问题)
-- [项目结构](#项目结构)
-- [参考资料](#参考资料)
+本机已使用 Forerunner 255 中国区账号验证 MCP 查询和微信收发。其他型号、地区或固件需自行验证，接口有字段不代表账号一定有数据。
 
----
+## 数据如何流动
 
-## 这是什么
-
-一个把四样东西串起来的小系统：
-
-| 组件 | 作用 |
-|---|---|
-| **Garmin Connect（中国区）** | 数据源：睡眠、HRV、静息心率、Body Battery、运动记录 |
-| **只读 MCP 服务器** | 把佳明数据包装成 3 个只读工具，供模型调用 |
-| **OpenClaw 网关** | 教练的「大脑外壳」：接微信、加载工具、管理会话 |
-| **DeepSeek API** | 真正的大模型，负责理解问题和生成中文回复 |
-
-核心设计原则是**只读**：它不会修改你的佳明账号、活动或手表设置，也拿不到 GPS 路线、活动名称等敏感字段。
-
-## 架构
-
-```
-       ┌──────────────┐
-       │    微信      │  发消息 / 收回复
-       └──────┬───────┘
-              │  长轮询（openclaw-weixin 插件）
-              ▼
-   ┌──────────────────────┐
-   │   OpenClaw Gateway   │  本机 127.0.0.1:18789
-   │  ┌────────────────┐  │
-   │  │ 教练人格与规则  │  │  coach/SOUL.md、AGENTS.md
-   │  └───────┬────────┘  │
-   └──────────┼───────────┘
-              │  MCP (stdio)
-              ▼
-   ┌──────────────────────┐        ┌────────────────┐
-   │  garmin_mcp_server   │        │  DeepSeek API  │
-   │  （只读 3 个工具）   │        └───────┬────────┘
-   └──────────┬───────────┘                │ HTTPS
-              │                            │
-              ▼                            │
-   ┌──────────────────────┐                │
-   │ Garmin Connect 中国区 │                │
-   │   （复用本地令牌）    │                │
-   └──────────────────────┘                │
-                                           │
-              OpenClaw 网关 ───────────────┘
+```mermaid
+flowchart LR
+    W[微信提问] --> O[本机 OpenClaw]
+    O --> M[只读 MCP 工具]
+    M --> G[Garmin Connect 中国区]
+    G --> M
+    M --> O
+    O --> D[DeepSeek API 分析]
+    D --> O
+    O --> R[微信回复]
 ```
 
-## 功能
+手表先通过 Garmin Connect 同步。程序查询云端已有记录，不直接实时连接手表。被选中的数据和必要的聊天上下文会交给模型服务分析；微信、佳明和模型供应商都会参与相应的数据流。
 
-- **微信双向对话** —— 在微信里直接问，机器人直接答
-- **真实数据，不编造** —— 工具返回空值时明确说「没有数据」，不会把缺失值当成 0
-- **只读安全边界** —— 三个工具都标注 `readOnlyHint`，无写入能力
-- **本地缓存** —— 历史数据缓存 24 小时、当天数据 15 分钟，减少对佳明的请求
-- **日报** —— 可配置北京时间每天 08:00 主动推送健康摘要
-- **凭据隔离** —— 令牌、API 密钥全部在 `.private/`（已被 Git 忽略）
-- **可换模型** —— 供应商定义在配置文件里，换模型只改一个字段
+## 开始使用
 
-## 快速开始
-
-### 前置条件
-
-- Windows（脚本面向 Windows；Linux 可用 [Docker 方式](deploy/README.md)）
-- Python 3.12
-- Node.js **>=24.22.1 <25** 或 **>=26.12.1**（OpenClaw 2026.10.6 的要求）
-- 佳明中国区账号
-- DeepSeek API 密钥（[platform.deepseek.com](https://platform.deepseek.com/api_keys)）
-- 一个可扫码绑定的微信机器人入口
-
-### 步骤
-
-**1. 安装 Python 依赖**
+需要 Windows、Python 3.12、佳明中国区账号、DeepSeek API 密钥，以及可绑定的微信渠道。OpenClaw 固定为 `2026.10.6`；本项目启动脚本接受 Node `>=24.22.1 <25` 或 `>=26.12.1`。
 
 ```powershell
-git clone <你的仓库地址>
-cd garmin
-
+git clone https://github.com/Flourshing/garmin-coach.git
+cd garmin-coach
 python -m venv .venv
-& '.\.venv\Scripts\python.exe' -m ensurepip --upgrade --default-pip
-& '.\.venv\Scripts\python.exe' -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-**2. 安装 OpenClaw 运行时**
+接下来按 [安装与启动](docs/SETUP.md) 准备运行时、填写本机密钥、登录佳明并绑定微信。准备完成后，日常双击 **`启动佳明教练.cmd`**。
+
+本机模式需要电脑保持开机、联网和唤醒。每天 08:00 的任务由准备脚本创建为**停用**状态；配置了任务不等于已启用推送。电脑关机后继续运行，需要另行部署常驻服务，见 [云端部署](deploy/README.md)。
+
+## 可以读取的数据
+
+| 工具 | 用途 |
+| --- | --- |
+| `get_health_summary` | 连续 1–28 天的睡眠分期、HRV、心率、压力、电量、步数、热量和运动摘要 |
+| `get_recent_activities` | 分页运动列表、活动编号、名称与已有表现指标 |
+| `get_sleep_details` | 一晚睡眠详情，可按需附带阶段、心率、血氧、呼吸等曲线 |
+| `get_health_timeseries` | 按类别读取指定一天的健康曲线与事件 |
+| `get_training_metrics` | 训练状态、负荷、VO₂max、比赛预测、健康年龄、阈值、FTP 和区间设置 |
+| `get_activity_details` | 单次运动的摘要、曲线、分圈、区间、力量组数等 |
+| `get_training_workouts` | 自定义训练课、步骤、月份日历和已有计划 |
+| `get_personal_records` | 已有个人纪录及关联运动 |
+| `get_device_capabilities` | 型号和功能支持标记 |
+| `get_data_status` | 检查本地凭证文件是否存在，不验证在线登录 |
+
+参数、查询示例与单位说明见 [MCP 数据接口](docs/MCP.md)。曲线默认最多 240 点，可选 2–2000 点，长曲线会抽样并标记；当天或最新类缓存 15 分钟，历史日期缓存 24 小时。
+
+## 在微信里调整推送
+
+可以直接说：
+
+> 以后日报不展示血氧和热量，重点分析睡眠分期、HRV 和训练负荷。先给结论，再给两三项依据，控制在 300 字以内。请保存为长期偏好。
+
+bot 应将长期要求写入 `PREFERENCES.md`，读回核对后再确认保存。只针对本次的要求不会自动覆盖长期设置。
+
+| 调整内容 | 在微信中处理 |
+| --- | --- |
+| 主题、字数、语气、已有指标的展示、分析回看范围 | 可以，保存偏好后用于后续回复和日报 |
+| 选择已有工具或分类查询 | 可以，在工具参数范围内按问题选择 |
+| 新增底层字段、严格禁止某数据传给模型、改变单位或计算方式 | 需要改 MCP 代码；隐藏展示不等于停止读取 |
+| 推送时间、启停、收件人 | 需要修改并验证定时任务，当前 bot 不具备任务管理权限 |
+
+普通内容偏好无需回到 GPT 确认。详细说明见 [微信偏好与持久化](docs/PREFERENCES.md)。
+
+## 文件怎么组织
+
+```text
+coach/                    初始规则、用户资料、偏好和记忆模板
+  PREFERENCES.md           内容偏好模板
+  SOUL.md / AGENTS.md      项目维护的规则
+  USER.md / MEMORY.md      初始用户资料与长期记忆
+docs/                     安装、接口、偏好和开发说明
+tests/                    离线测试，不连接账号或模型
+scripts/diagnostics/      可选的微信、模型连接检查
+deploy/                   容器启动、供应商配置和部署文档
+garmin_mcp_server.py       MCP 工具入口
+garmin_service.py         摘要查询和缓存
+garmin_extended.py        分类查询、曲线和运动详情
+garmin_data.py            共享字段、过滤、抽样和安全错误信息
+collect.py                佳明登录与采集命令
+prepare_openclaw.py       准备配置、同步规则并保留个人偏好
+.private/                 本机凭据、工作区、缓存和报告，不提交 Git
+```
+
+根目录保留日常启动、登录和准备命令。旧 GPT/Plus 接入与早期验证脚本已退出当前流程，本机原件保留在私有备份中。
+
+## 验证与维护
 
 ```powershell
-cd .runtime
-npm install --no-audit --no-fund
-cd ..
+# 离线测试：不访问佳明、不调用模型、不发送微信
+.\.venv\Scripts\python.exe -m unittest discover -s tests -t . -v
+
+# 验证 MCP 协议和工具注册
+.\.venv\Scripts\python.exe -X utf8 verify_current_mcp.py
+
+# 真实读取账号；日期换成已同步的一天，不调用模型或发送微信
+.\.venv\Scripts\python.exe -X utf8 verify_current_mcp.py --live --end-date 2026-10-26
 ```
 
-> ⚠️ 注意 Node 版本。若默认 `node` 版本过低，用 `OPENCLAW_NODE` 指定符合要求的路径。
+更多见 [开发与维护](docs/DEVELOPMENT.md)。遇到离线、缺数据或推送问题，先看 [故障排查](docs/TROUBLESHOOTING.md)。
 
-**3. 填写模型密钥**
+## 隐私与使用边界
 
-```powershell
-New-Item -ItemType Directory -Force .private | Out-Null
-Copy-Item .env.example .private\.env.dsh
-notepad .private\.env.dsh   # 填入 DEEPSEEK_API_KEY=sk-...
-```
+`.private/`、虚拟环境、Node 依赖和本机日志不进入仓库；容器构建采用文件白名单。登录令牌和模型密钥保存在本机，未额外加密，需要自行保管。账号标识、设备序列号和凭据不会作为健康工具结果返回；活动名称、编号和显式开启的轨迹仍属于个人数据。
 
-**4. 登录佳明中国区（只需一次）**
+本项目使用非官方 `python-garminconnect` 客户端，接口变化可能影响可用性。健康和训练建议不能替代医疗诊断。
 
-双击 `login.cmd`，按提示输入中国区账号、密码和验证码。
+## 参考与许可
 
-> 密码和验证码不会写入脚本或日志。登录令牌保存在 `.private/tokens/`，**请像密码一样保管**——它未额外加密。
-
-**5. 验证链路**
-
-```powershell
-& '.\.venv\Scripts\python.exe' -X utf8 collect.py --check
-& '.\.venv\Scripts\python.exe' -X utf8 check_deepseek_setup.py
-```
-
-**6. 绑定微信并启动**
-
-```powershell
-.\connect-wechat.cmd       # 首次绑定，弹出二维码
-.\启动佳明教练.cmd          # 日常启动，窗口需保持打开
-```
-
-看到 `http server listening (2 plugins: memory-core, openclaw-weixin)` 即成功。
-
-## 配置说明
-
-### 模型供应商
-
-默认使用 DeepSeek 官方 OpenAI 兼容端点，定义在 [`deploy/deepseek-provider.json`](deploy/deepseek-provider.json)：
-
-```json
-{
-  "baseUrl": "https://api.deepseek.com",
-  "api": "openai-completions",
-  "auth": "api-key",
-  "apiKey": "${DEEPSEEK_API_KEY}",
-  "models": [{ "id": "deepseek-flash", "name": "DeepSeek V4 Flash" }]
-}
-```
-
-换模型只改 `models[0].id`，例如 `deepseek-v4-pro`。
-
-### 环境变量
-
-见 [`.env.example`](.env.example)：
-
-| 变量 | 说明 |
-|---|---|
-| `DEEPSEEK_API_KEY` | 模型密钥，**必填** |
-| `OPENCLAW_GATEWAY_TOKEN` | 网关访问令牌，云端必填 |
-| `OPENCLAW_PUBLIC_ORIGIN` | 公开 HTTPS 域名，云端填写 |
-| `PORT` | 监听端口，云端为 8080 |
-| `GARMIN_DATA_DIR` | 佳明数据目录，云端建议 `/data/garmin` |
-| `OPENCLAW_NODE` | 指定 Node 路径（版本不符时使用） |
-
-### 教练人格
-
-教练的语气、规则和记忆都在 [`coach/`](coach/)，都是 Markdown，改它们不需要碰代码：
-
-| 文件 | 用途 |
-|---|---|
-| `SOUL.md` | 人格、回答风格、安全边界 |
-| `AGENTS.md` | 工作区约定：每次会话读哪些文件 |
-| `USER.md` | 用户已确认的信息（手表、时区、渠道等） |
-| `MEMORY.md` | 长期记忆 |
-
-## 可用工具
-
-MCP 服务器 [`garmin_mcp_server.py`](garmin_mcp_server.py) 暴露三个**只读**工具：
-
-| 工具 | 说明 |
-|---|---|
-| `get_health_summary` | 最近 1–28 天的睡眠、HRV、静息心率、Body Battery、活动摘要 |
-| `get_recent_activities` | 最近 1–20 条运动的日期、距离、时长、心率（**不含路线和活动名称**） |
-| `get_data_status` | 仅检查本地凭证是否存在，不发网络请求 |
-
-缺失指标保持为空并单独标记——**空值不等于零**，这是刻意的设计。
-
-## 部署到云端
-
-本地运行的前提是电脑一直开机。想让关机后也能用，需要把服务搬到常开的机器上。
-
-项目已准备好容器化部署：
-
-```powershell
-# 生成只含必需程序文件的干净构建目录（不含任何密钥）
-& '.\.venv\Scripts\python.exe' -X utf8 prepare_railway_build.py
-```
-
-完整部署清单见 **[deploy/README.md](deploy/README.md)**。关键点：
-
-- 需要**常驻不休眠**的平台——微信是长轮询，休眠即掉线
-- 必须挂载持久卷到 `/data`，否则容器重建后要重新登录
-- **同一个微信账号不能本机与云端同时接收**，切换前先停本机
-
-## 安全与隐私
-
-| 措施 | 实现 |
-|---|---|
-| 凭据不入库 | `.private/` 在 `.gitignore` 中；镜像构建白名单不含密钥 |
-| 只读工具 | 三个 MCP 工具全部标注 `readOnlyHint=True` |
-| 数据最小化 | 不返回 GPS 路线、活动名称、活动 ID、账号标识 |
-| 错误脱敏 | 上游异常统一包装，避免泄露 URL、cookie、service ticket |
-| 工具白名单 | `tools.deny` 禁用 `exec`、`process`、`subagents` 等 |
-| 文件范围限制 | `tools.fs.workspaceOnly: true` |
-
-**你需要自己保管好：**
-
-- `.private/tokens/` —— 佳明登录令牌，等同密码
-- `.private/.env.dsh` —— 模型 API 密钥
-- `.private/openclaw/openclaw.json` —— 含网关访问令牌
-
-## 常见问题
-
-**Q：手机上提示「暂时无法连接 OpenClaw」？**
-A：网关没在跑。双击 `启动佳明教练.cmd`，等 1–2 分钟，别关那个黑窗口。
-
-**Q：过一段时间就断了？**
-A：电脑睡眠了。把电源设置改成「永不睡眠」，或部署到云端。
-
-**Q：佳明 MCP 连不上（`MCP error -32000`）？**
-A：多为 Python 依赖损坏，重装即可：
-
-```powershell
-& '.\.venv\Scripts\python.exe' -m pip install --force-reinstall -r requirements.txt
-```
-
-**Q：微信插件加载失败（`missing-openclaw-peer-link`）？**
-A：插件的 peer link 断了。在插件安装目录重建指向 openclaw 的链接，或重跑插件安装。
-
-**Q：`No suitable Node.js found`？**
-A：Node 版本不满足要求。安装 Node 24.22.1+ 或 26.12.1+，或用 `OPENCLAW_NODE` 指定路径。
-
-**Q：日报没有按时推送？**
-A：正式定时任务默认**停用**。先手动测一次：`python prepare_daily_job.py --run-test`。
-
-## 项目结构
-
-```
-.
-├── coach/                  # 教练人格与记忆（Markdown，可自由修改）
-├── deploy/                 # 云端部署：供应商配置、容器定义、部署清单
-├── collect.py              # 佳明数据采集（CLI）
-├── garmin_service.py       # 只读佳明接口 + 缓存
-├── garmin_mcp_server.py    # MCP 服务器（3 个只读工具）
-├── prepare_openclaw.py     # 生成 OpenClaw 配置
-├── prepare_daily_job.py    # 创建日报定时任务
-├── verify_mcp.py           # MCP 链路验证
-├── check_deepseek_setup.py # 一键自检（不打印密钥）
-├── openclaw.ps1 / .cmd     # OpenClaw 启动封装（自动定位 Node、注入密钥）
-├── start-coach.ps1         # 教练启动脚本
-├── 启动佳明教练.cmd         # ← 日常双击这个
-├── login.cmd               # 佳明登录
-├── Dockerfile              # 云端容器定义
-└── .env.example            # 环境变量模板
-```
-
-## 参考资料
-
-- [python-garminconnect 0.3.10](https://github.com/cyberjunky/python-garminconnect/tree/0.3.10) —— 非官方佳明客户端
-- [Garth 维护者公告](https://github.com/matin/garth#garth) —— 旧认证流程变更说明
-- [腾讯微信插件](https://github.com/Tencent/openclaw-weixin/blob/main/README.zh_CN.md)
-- [微信渠道协议与发送限制](https://github.com/Tencent/openclaw-weixin/blob/main/docs/protocol.md)
+- [python-garminconnect](https://github.com/cyberjunky/python-garminconnect)
+- [腾讯微信渠道插件](https://github.com/Tencent/openclaw-weixin/blob/main/README.zh_CN.md)
 - [OpenClaw 文档](https://docs.openclaw.ai)
 - [DeepSeek API 文档](https://api-docs.deepseek.com)
 
-## 免责声明
-
-本项目使用**非官方**的佳明客户端（`python-garminconnect`），与 Garmin 官方无关，接口变更可能导致失效。
-
-在依赖本项目的健康建议之前请记住：**它不是医疗器械，不能替代医生。**
-
-## License
-
-[MIT](LICENSE)
+[MIT License](LICENSE)

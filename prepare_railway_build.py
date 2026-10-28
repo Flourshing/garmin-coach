@@ -8,9 +8,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 FILES = (
     "Dockerfile", ".dockerignore", "railway.json", "requirements.txt",
-    "collect.py", "verify_mcp.py", "garmin_service.py", "garmin_mcp_server.py",
+    "collect.py", "garmin_service.py", "garmin_mcp_server.py", "garmin_data.py", "garmin_extended.py",
     "prepare_openclaw.py", "prepare_daily_job.py",
-    "coach/AGENTS.md", "coach/MEMORY.md", "coach/SOUL.md", "coach/USER.md",
+    "coach/AGENTS.md", "coach/MEMORY.md", "coach/SOUL.md", "coach/USER.md", "coach/PREFERENCES.md",
     "deploy/runtime-package.json", "deploy/cloud_start.py",
     "deploy/codex-restricted-settings.json", "deploy/deepseek-provider.json",
     "deploy/daily-report-prompt.txt",

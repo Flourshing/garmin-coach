@@ -4,9 +4,11 @@ import os
 import secrets
 import shutil
 import sys
+from hashlib import sha256
 from pathlib import Path
 
 from garmin_service import atomic_json
+from garmin_data import TOOL_NAMES
 
 ROOT = Path(__file__).resolve().parent
 STATE = Path(os.environ.get("OPENCLAW_STATE_DIR", ROOT / ".private" / "openclaw"))
@@ -14,12 +16,26 @@ WORKSPACE = Path(os.environ.get("OPENCLAW_WORKSPACE_DIR", ROOT / ".private" / "c
 CONFIG = Path(os.environ.get("OPENCLAW_CONFIG_PATH", STATE / "openclaw.json"))
 
 
-def prepare():
-    WORKSPACE.mkdir(parents=True, exist_ok=True)
-    for source in (ROOT / "coach").glob("*.md"):
-        target = WORKSPACE / source.name
+def sync_workspace(templates, workspace):
+    """Update managed rules while preserving the user's preferences and memory."""
+    workspace.mkdir(parents=True, exist_ok=True)
+    for source in templates.glob("*.md"):
+        target = workspace / source.name
         if not target.exists():
             shutil.copyfile(source, target)
+        elif source.name in {"AGENTS.md", "SOUL.md"} and target.read_bytes() != source.read_bytes():
+            # Local rule edits remain recoverable; personal files are never overwritten.
+            previous = target.read_bytes()
+            backups = workspace / ".template-backups"
+            backups.mkdir(exist_ok=True)
+            backup = backups / f"{target.stem}-{sha256(previous).hexdigest()[:12]}.md"
+            if not backup.exists():
+                backup.write_bytes(previous)
+            shutil.copyfile(source, target)
+
+
+def prepare():
+    sync_workspace(ROOT / "coach", WORKSPACE)
     config = json.loads(CONFIG.read_text(encoding="utf-8")) if CONFIG.is_file() else {}
     gateway = config.setdefault("gateway", {})
     gateway.setdefault("mode", "local")
@@ -84,7 +100,7 @@ def prepare():
         "command": sys.executable,
         "args": ["-X", "utf8", str(ROOT / "garmin_mcp_server.py")],
         "requestTimeoutMs": 120000,
-        "toolFilter": {"include": ["get_health_summary", "get_recent_activities", "get_data_status"]},
+        "toolFilter": {"include": list(TOOL_NAMES)},
         "codex": {"defaultToolsApprovalMode": "approve"},
     }
     config["tools"] = {

@@ -10,12 +10,14 @@ from pathlib import Path
 from uuid import uuid4
 
 from collect import CHINA, collect, subset
+from garmin_data import ACTIVITY_FIELDS, clean_data
 
 ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get("GARMIN_DATA_DIR", ROOT / ".private")).resolve()
 TOKENS = DATA / "tokens"
 CACHE = DATA / "health-cache"
 LOCK = threading.RLock()
+CACHE_SCHEMA = 2
 
 
 def atomic_json(path: Path, value):
@@ -40,7 +42,7 @@ def connection():
 
 
 def selected_dates(days: int, end_date: str | None):
-    if isinstance(days, bool) or not 1 <= days <= 28:
+    if isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= 28:
         raise ValueError("days 必须在 1 到 28 之间。")
     today = datetime.now(CHINA).date()
     end = date.fromisoformat(end_date) if end_date else today
@@ -64,14 +66,16 @@ def health_summary(days: int = 7, end_date: str | None = None, refresh: bool = F
                     candidate = json.loads(path.read_text(encoding="utf-8"))
                     age = now - datetime.fromisoformat(candidate["retrieved_at"])
                     ttl = timedelta(minutes=15) if day == now.date() else timedelta(hours=24)
-                    if timedelta(0) <= age < ttl and candidate["record"]["date"] == day.isoformat():
+                    if (candidate.get("schema_version") == CACHE_SCHEMA and
+                            timedelta(0) <= age < ttl and candidate["record"]["date"] == day.isoformat()):
                         cached = candidate
                 except (ValueError, KeyError, TypeError):
                     pass
             if cached is None:
                 api = api or connection()
                 row = collect(api, 1, day)[0]
-                cached = {"retrieved_at": datetime.now(CHINA).isoformat(), "record": row}
+                cached = {"schema_version": CACHE_SCHEMA,
+                          "retrieved_at": datetime.now(CHINA).isoformat(), "record": row}
                 # Failed endpoints are not cached as a complete day.
                 if not row.get("unavailable"):
                     atomic_json(path, cached)
@@ -84,20 +88,26 @@ def health_summary(days: int = 7, end_date: str | None = None, refresh: bool = F
         "generated_at": datetime.now(CHINA).isoformat(),
         "notes": ["空值不是零；今天的运动总量仍可能变化。",
                   "Body Battery 为当日最高/最低值，不代表此刻电量。",
+                  "bodyBatteryMostRecentValue 是所查日期的最近同步值，不是此刻实时值。",
+                  "睡眠时间使用 GMT 毫秒时间戳转北京时间；清醒时长不计入总睡眠。",
                   "HRV 状态 NONE 表示状态不可用，不能解释成恢复不佳。"],
         "records": records,
     }
 
 
-def recent_activities(limit: int = 5):
+def recent_activities(limit: int = 5, start: int = 0, activity_type: str | None = None):
     if isinstance(limit, bool) or not 1 <= limit <= 20:
         raise ValueError("limit 必须在 1 到 20 之间。")
+    if isinstance(start, bool) or not isinstance(start, int) or not 0 <= start <= 10000:
+        raise ValueError("start 必须在 0 到 10000 之间。")
+    if activity_type not in {None, "running", "cycling", "swimming", "multi_sport", "fitness_equipment", "hiking", "walking", "other"}:
+        raise ValueError("请使用支持的运动大类；子类型请在返回列表中识别。")
     with LOCK:
-        rows = connection().get_activities(0, limit) or []
-    keys = ("startTimeLocal", "activityType", "distance", "duration", "movingDuration",
-            "averageHR", "maxHR", "averageSpeed", "aerobicTrainingEffect")
-    # No account IDs, activity names, activity IDs or GPS points leave this service.
-    return {"timezone": "Asia/Shanghai", "activities": [subset(row, keys) for row in rows],
+        api = connection()
+        rows = api.get_activities(start, limit, activity_type) or []
+    return {"timezone": "Asia/Shanghai", "retrieved_at": datetime.now(CHINA).isoformat(),
+            "start": start, "limit": limit,
+            "activities": [clean_data(subset(row, ACTIVITY_FIELDS)) for row in rows],
             "units": {"distance": "meters", "duration": "seconds", "averageSpeed": "meters/second"}}
 
 

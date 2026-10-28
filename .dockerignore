@@ -3,9 +3,10 @@
 !railway.json
 !requirements.txt
 !collect.py
-!verify_mcp.py
 !garmin_service.py
 !garmin_mcp_server.py
+!garmin_data.py
+!garmin_extended.py
 !prepare_openclaw.py
 !prepare_daily_job.py
 !coach/

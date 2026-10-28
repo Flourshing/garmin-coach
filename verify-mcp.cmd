@@ -1,6 +1,13 @@
 @echo off
 chcp 65001 >nul
-title Garmin China updated login
+title Garmin MCP verification
 cd /d "%~dp0"
-echo 原项目的旧认证依赖已失效，正在改用新版中国区只读登录验证。
-call "%~dp0login.cmd"
+if not exist ".venv\Scripts\python.exe" (
+  echo Please follow docs/SETUP.md to prepare Python first.
+  pause
+  exit /b 2
+)
+".venv\Scripts\python.exe" -X utf8 verify_current_mcp.py %*
+set "VERIFY_EXIT=%ERRORLEVEL%"
+pause
+exit /b %VERIFY_EXIT%

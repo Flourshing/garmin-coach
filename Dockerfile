@@ -10,7 +10,7 @@ COPY requirements.txt /opt/garmin/requirements.txt
 RUN python3 -m venv /opt/garmin/venv && /opt/garmin/venv/bin/pip install --no-cache-dir -r /opt/garmin/requirements.txt
 
 WORKDIR /app
-COPY collect.py verify_mcp.py garmin_service.py garmin_mcp_server.py prepare_openclaw.py prepare_daily_job.py /app/
+COPY collect.py garmin_service.py garmin_mcp_server.py garmin_data.py garmin_extended.py prepare_openclaw.py prepare_daily_job.py /app/
 COPY coach /app/coach
 COPY deploy/cloud_start.py /app/cloud_start.py
 COPY deploy/codex-restricted-settings.json /app/deploy/codex-restricted-settings.json

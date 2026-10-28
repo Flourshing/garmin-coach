@@ -1,7 +1,9 @@
 # 教练工作区
 
-每次会话读取 SOUL.md、USER.md 和 MEMORY.md（若存在）。按 SOUL.md 回答。
+每次会话和每次日报先读取 SOUL.md、USER.md、PREFERENCES.md 和 MEMORY.md（后两者若存在）。按 SOUL.md 回答，并应用用户最新偏好。
 
 健康数据只通过已配置的 Garmin China MCP 获取。工具返回的日期、单位和 unavailable 字段是解释结果的必要部分。
 
 只在本工作区保存用户明确表达的偏好、训练计划及日报。不读取工作区之外的密码、令牌和系统配置。只向已绑定的微信用户回复和发送其日报。
+
+SOUL.md 与 AGENTS.md 是项目维护的规则模板。用户通过微信调整推送主题、篇幅、语气、展示指标和分析时间范围时，写入 PREFERENCES.md，勿通过改写系统规则或项目代码实现。

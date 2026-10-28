@@ -1,11 +1,12 @@
 import tempfile
 import unittest
+import json
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
 import garmin_service as service
-from test_collect import FakeGarmin
+from tests.test_collect import FakeGarmin
 
 
 class ServiceTests(unittest.TestCase):
@@ -31,6 +32,19 @@ class ServiceTests(unittest.TestCase):
         with self.assertRaises(ValueError) as raised:
             service.safe_call(broken)
         self.assertNotIn("SECRET_TOKEN", str(raised.exception))
+
+    def test_old_schema_cache_is_rebuilt_for_new_fields(self):
+        with tempfile.TemporaryDirectory(dir=service.ROOT) as folder:
+            today = datetime.now(service.CHINA).date().isoformat()
+            Path(folder, today + ".json").write_text(json.dumps({
+                "retrieved_at": datetime.now(service.CHINA).isoformat(),
+                "record": {"date": today, "sleep": {"hours": 1}},
+            }), encoding="utf-8")
+            with patch.object(service, "CACHE", Path(folder)), patch.object(service, "connection", return_value=FakeGarmin()) as connect:
+                row = service.health_summary(1)["records"][0]
+                self.assertEqual(row["sleep"]["hours"], 7.5)
+                self.assertIn("deep_seconds", row["sleep"])
+                self.assertEqual(connect.call_count, 1)
 
 
 if __name__ == "__main__":
