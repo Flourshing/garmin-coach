@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parent
 FILES = (
     "Dockerfile", ".dockerignore", "railway.json", "requirements.txt",
     "collect.py", "garmin_service.py", "garmin_mcp_server.py", "garmin_data.py", "garmin_extended.py", "garmin_charts.py",
-    "prepare_openclaw.py", "prepare_daily_job.py",
+    "prepare_openclaw.py", "prepare_daily_job.py", "configure_models.py",
     "coach/AGENTS.md", "coach/MEMORY.md", "coach/SOUL.md", "coach/USER.md", "coach/PREFERENCES.md",
     "deploy/runtime-package.json", "deploy/cloud_start.py",
     "deploy/codex-restricted-settings.json", "deploy/deepseek-provider.json",

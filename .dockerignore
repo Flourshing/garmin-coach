@@ -9,6 +9,7 @@
 !garmin_extended.py
 !garmin_charts.py
 !prepare_openclaw.py
+!configure_models.py
 !prepare_daily_job.py
 !coach/
 !coach/*.md

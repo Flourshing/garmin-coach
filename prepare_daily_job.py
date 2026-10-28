@@ -74,7 +74,7 @@ def main():
                      "--description", "Garmin China daily report, pending hosted deployment",
                      "--declaration-key", "garmin-cn-daily-0800", "--agent", "main",
                      "--cron", "0 8 * * *", "--tz", "Asia/Shanghai", "--exact", "--disabled",
-                     "--session", "isolated", "--message", prompt, "--thinking", "low",
+                     "--session", "isolated", "--message", prompt,
                      "--timeout-seconds", "180", "--tools", "bundle-mcp,read,write,tool_search,tool_describe,tool_call",
                      "--announce", "--channel", "openclaw-weixin", "--account", account, "--to", owner, "--json")
         job = result.get("job", result)

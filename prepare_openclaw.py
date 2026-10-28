@@ -79,20 +79,20 @@ def prepare():
     defaults = config.setdefault("agents", {}).setdefault("defaults", {})
     defaults.update(workspace=str(WORKSPACE.resolve()), userTimezone="Asia/Shanghai", skipBootstrap=True)
     defaults.setdefault("skills", [])
-    defaults["model"] = {"primary": "deepseek/deepseek-flash"}
+    # Preparation must not undo the operator's model choice or fallback chain.
+    defaults.setdefault("model", {"primary": "deepseek/deepseek-flash"})
     defaults.setdefault("models", {}).setdefault("deepseek/deepseek-flash", {})["agentRuntime"] = {"id": "openclaw"}
-    # DeepSeek uses an API key (from DEEPSEEK_API_KEY), not an OAuth profile,
-    # so no ordered auth-profile entry is required here.
-    config.setdefault("auth", {}).pop("order", None)
-    allowed_plugins = ["memory-core", "openclaw-weixin"]
+    # Preserve subscription auth ordering and approved provider plugins.
+    allowed_plugins = list(config.setdefault("plugins", {}).get("allow", []))
+    for plugin in ["memory-core", "openclaw-weixin"]:
+        if plugin not in allowed_plugins:
+            allowed_plugins.append(plugin)
     if "codex" in config.setdefault("plugins", {}).get("entries", {}):
-        allowed_plugins.append("codex")
+        if "codex" not in allowed_plugins:
+            allowed_plugins.append("codex")
     config["plugins"]["allow"] = allowed_plugins
     config.setdefault("models", {}).setdefault("providers", {})["deepseek"] = json.loads((ROOT / "deploy/deepseek-provider.json").read_text(encoding="utf-8"))
-    # 彻底停用 OpenAI(GPT) 供应商与插件，不再保留 GPT 配置。
-    config.setdefault("models", {}).setdefault("providers", {}).pop("openai", None)
-    config.setdefault("plugins", {}).setdefault("entries", {})["openai"] = {"enabled": False}
-    defaults.pop("modelPolicy", None)
+    config.setdefault("plugins", {}).setdefault("entries", {}).setdefault("openai", {"enabled": False})
     defaults.setdefault("heartbeat", {})["every"] = "0m"
     config.setdefault("plugins", {}).setdefault("entries", {}).setdefault("memory-core", {}).setdefault("config", {}).setdefault("dreaming", {})["enabled"] = False
     config.setdefault("session", {})["dmScope"] = "per-account-channel-peer"

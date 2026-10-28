@@ -18,4 +18,4 @@ jobs:
           cache: pip
       - run: python -m pip install -r requirements.txt
       - run: python -m unittest discover -s tests -t . -v
-      - run: python -m compileall -q collect.py garmin_data.py garmin_extended.py garmin_charts.py garmin_service.py garmin_mcp_server.py prepare_openclaw.py
+      - run: python -m compileall -q collect.py garmin_data.py garmin_extended.py garmin_charts.py garmin_service.py garmin_mcp_server.py prepare_openclaw.py configure_models.py prepare_daily_job.py

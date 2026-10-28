@@ -4,7 +4,7 @@
 
 根目录保留运行模块和用户入口，避免移动入口导致已配置的 MCP 路径失效。`tests/` 只放离线测试，`scripts/diagnostics/` 放可选的运行诊断，`docs/` 放操作说明，`deploy/` 放部署文件。
 
-旧订阅接入、旧认证客户端和带固定日期的验证脚本已退出当前流程。现用客户端为 `garminconnect==0.3.10`，共享错误信息处理位于 `garmin_data.safe_error`，MCP 验证入口是 `verify_current_mcp.py`。
+旧订阅接入、旧认证客户端和带固定日期的验证脚本已退出当前流程。现用客户端为 `garminconnect==0.3.10`，共享错误信息处理位于 `garmin_data.safe_error`，MCP 验证入口是 `verify_current_mcp.py`。GPT 订阅使用 OpenClaw 的 OAuth 流程，双模型设置入口为 `configure_models.py`，见 [模型配置](MODELS.md)。
 
 ## 本地检查
 
@@ -15,6 +15,8 @@
 ```
 
 单元测试不使用个人凭据、不访问网络、不产生模型费用。GitHub Actions 在 Windows 和 Linux 上运行离线检查。
+
+安装本机 OpenClaw 运行时后，可运行 `node scripts/diagnostics/verify_model_fallback.mjs`，对固定版本的实际备用执行器注入限流、额度、超时、认证和连接重置错误。此诊断不访问模型、不读取凭证、不发送消息；真实模型调用和真实额度耗尽需另行验证。
 
 真实查询需本机已登录：
 

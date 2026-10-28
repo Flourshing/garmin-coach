@@ -38,7 +38,7 @@ Copy-Item .env.example .private/.env.dsh
 notepad .private/.env.dsh
 ```
 
-填写自己的 `DEEPSEEK_API_KEY`。启动封装会从该文件读取密钥；不要把真实值写进源码或聊天。模型供应商和模型编号定义在 `deploy/deepseek-provider.json`，若更换编号，还需同步 `prepare_openclaw.py` 的默认模型配置并验证。
+填写自己的 `DEEPSEEK_API_KEY`。启动封装会从该文件读取密钥；不要把真实值写进源码或聊天。DeepSeek 供应商和编号定义在 `deploy/deepseek-provider.json`。如需 GPT 订阅优先、DeepSeek 自动备用和微信切换，完成基础准备后按 [双模型设置](MODELS.md) 操作；准备脚本会保留已经设置的模型与认证顺序。
 
 ## 4. 微信插件与教练配置
 
